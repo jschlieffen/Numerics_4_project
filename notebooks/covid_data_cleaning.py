@@ -22,18 +22,22 @@ def _(os, pd):
             df: pd.DataFrame = pd.read_csv(os.path.join('../data', filename),
             usecols=['date', 'value'], parse_dates=['date'])
             df.rename(columns={'date': 'Day', 'value': dict_name}, inplace=True)
+            df.set_index('Day', inplace=True)
             df_lst.append(df)
         else:
             dict_name: str = filename.split('.')[0]
             df = pd.read_csv(os.path.join('../data', filename), parse_dates=['Day'])
             df.rename(columns={df.columns[-1]: dict_name}, inplace=True)
-            df_lst.append(df[['Day', dict_name]])
+            df=df[['Day', dict_name]]
+            df.set_index('Day', inplace=True)
+            df_lst.append(df)
     return (df_lst,)
 
 
 @app.cell
-def _(df_lst: "list[pd.DataFrame]"):
-    df_lst
+def _(df_lst: "list[pd.DataFrame]", pd):
+    merged = pd.concat(df_lst, axis=1, join='outer').sort_index()
+    merged.to_csv('../data/merged_covid_and_opinion_data.csv')
     return
 
 
