@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Apr  3 13:58:56 2025
+
+@author: jschlieffen
+"""
+
+import logging
+from datetime import datetime
+import configparser
+import os
+
+# =============================================================================
+# This file sets up the logger. It mimics the Logger provided by the 
+# C++ Boost libary. It also writes the log messages to a file 
+# that can be found under logs/flesctl/
+# =============================================================================
+
+class LogColors:
+    BLUE = "\033[34m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"  
+    GRAY = "\033[90m" 
+    RESET = "\033[0m"
+
+SUCCESS_LEVEL_NUM = 25  
+logging.addLevelName(SUCCESS_LEVEL_NUM, "SUCCESS")
+STATUS_LEVEL_NUM = 15
+logging.addLevelName(STATUS_LEVEL_NUM, "STATUS")
+
+def success(self, message, *args, **kws):
+    if self.isEnabledFor(SUCCESS_LEVEL_NUM):
+        self._log(SUCCESS_LEVEL_NUM, message, args, **kws)
+
+def status(self, message, *args, **kws):
+    if self.isEnabledFor(STATUS_LEVEL_NUM):
+        self._log(STATUS_LEVEL_NUM, message, args, **kws)
+
+logging.Logger.status = status
+
+
+logging.Logger.success = success
+
+class BoostLogFormatter(logging.Formatter):
+    def format(self, record):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        levelname = record.levelname
+        if levelname == "SUCCESS":
+            color = LogColors.GREEN       
+        elif levelname == "STATUS":
+            color = LogColors.CYAN
+        elif levelname == "INFO":
+            color = LogColors.BLUE
+        elif levelname == "WARNING":
+            color = LogColors.YELLOW
+        elif levelname == "ERROR":
+            color = LogColors.RED
+        elif levelname == "CRITICAL":
+            color = LogColors.MAGENTA
+        elif levelname == "DEBUG":
+            color = LogColors.GRAY  
+        else:
+            color = LogColors.RESET
+        log_message = f"{LogColors.GREEN}[{timestamp}]{LogColors.RESET} {color}{levelname}{LogColors.RESET}: {record.getMessage()}"
+        return log_message
+
+def setup_logger(write_logfile):
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(BoostLogFormatter())
+    logger.addHandler(console_handler)
+    # Disable matplotlib logging propagation
+    matplotlib_logger = logging.getLogger('matplotlib')
+    matplotlib_logger.setLevel(logging.WARNING)  
+    matplotlib_logger.propagate = False  
+
+    PIL_logger = logging.getLogger('PIL')
+    PIL_logger.setLevel(logging.WARNING)
+    PIL_logger.propagate = False
+    if write_logfile == '1':
+        config = configparser.ConfigParser()
+        config.read('config.cfg')
+        
+        run_id = config.getint('general', 'run_id')
+        config['general']['run_id'] = str(run_id+1)
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        file_handler = logging.FileHandler(f'logs/flesctl/Run_{str(run_id+1)}_{timestamp}.log')
+        file_handler.setFormatter(BoostLogFormatter())
+        logger.addHandler(file_handler)
+    return logger
+
+
+def set_loglvl(level, logger=None):
+    if logger is None:
+        logger = logging.getLogger()
+
+    if not isinstance(level, str):
+        raise ValueError("Log level must be a string")
+
+    level = level.upper()
+    if level in logging._nameToLevel:
+        logger.setLevel(logging._nameToLevel[level])
+    else:
+        raise ValueError(f"Unknown log level: {level}")
+
+    logger.setLevel(level)
+
+write_logfile = os.getenv('write_logfile')
+logger = setup_logger(write_logfile)
+
