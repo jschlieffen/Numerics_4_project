@@ -17,31 +17,32 @@ Created on Fri Jan 30 16:13:54 2026
 @author: jschlieffen
 """
 
-# =============================================================================
-# TODO: make V and W params.
-# =============================================================================
-
-
 class opinion_dynamics:
     
-    INF_RATE_MAX = 0.35
-    INF_RATE_MIN = 0.0225
-    INF_RATE_MAX_PLUS_MIN = INF_RATE_MAX + INF_RATE_MIN
-    INF_RATE_MAX_MINUS_MIN = INF_RATE_MAX - INF_RATE_MIN
-    REC_RATE = 0.1
+    INF_RATE_MAX: float = 0.35
+    INF_RATE_MIN: float = 0.0225
+    INF_RATE_MAX_PLUS_MIN: float = INF_RATE_MAX + INF_RATE_MIN
+    INF_RATE_MAX_MINUS_MIN: float = INF_RATE_MAX - INF_RATE_MIN
+    REC_RATE:float = 0.01
+    opinion_array: np.ndarray
+    infection_array: np.ndarray
+    opinions_curr: np.ndarray
+    infection_curr: np.ndarray
 
-    def __init__(self, num_grid_points: int, max_t: int, initial_opinions: np.ndarray, noise_strength: float, N:int,
-                 interaction_distance: float, y0: np.ndarray, stochiomatric_vectors: np.ndarray, grad_V: Callable):
+
+    def __init__(self, num_grid_points: int, max_t: int, initial_opinions: np.ndarray, y0: np.ndarray, N:int,
+                 interaction_distance: float, noise_strength: float, stochiomatric_vectors: np.ndarray, grad_V: Callable):
         self.t = np.linspace(0, max_t, num_grid_points)
         self.dt = max_t/num_grid_points
         
-        self.opinions_curr = initial_opinions.copy()
+        self.opinions_curr = np.copy(initial_opinions)
         self.opinion_array = np.zeros((num_grid_points, len(initial_opinions)), dtype=float)
-        self.opinion_array[0] = initial_opinions.copy()
+        self.opinion_array[0] = np.copy(initial_opinions)
         
-        self.infection_curr = y0.copy()
+        self.infection_curr = np.copy(y0)
         self.infection_array = np.zeros((num_grid_points, 3), dtype=float)
-        self.infection_array[0] = y0.copy()
+        self.infection_array[0] = np.copy(y0)
+        self.infection_num_array = np.zeros(num_grid_points)
         self.nu = np.array(stochiomatric_vectors)
         
         self.sigma = noise_strength
@@ -52,50 +53,59 @@ class opinion_dynamics:
     def algo(self):
         for i in range(1, len(self.t)):
             # Updating the Infection numbers
-            self.update_infected()
-            self.infection_array[i] = self.infection_curr.copy()
+            self.infection_num_array[i] = self.update_infected()
+            self.infection_array[i] = np.copy(self.infection_curr)
             # Apply grad_V to each agent with current infected numbers
             drift_V = self.grad_V(self.opinions_curr, self.infection_curr[1]/self.N)
             self.opinions_curr += -drift_V * self.dt
-            self.opinion_array[i] = self.opinions_curr.copy()
+            self.opinions_curr = np.clip(self.opinions_curr, -2, 2)
+            self.opinion_array[i] = np.copy(self.opinions_curr)
 
     def infection_propensity(self):
-        # TODO: Using the mean of opinion is really a band-aid solution, combinatorial assumption for Gillespie 
-        # is that the agents are identical s.t. the choice from susceptible/infected for reaction is simple
-        # when the agents' opinion affected the infection rate, the formula for propensity does not hold 
+        # TODO: Using the mean of opinion is really a band-aid solution, combinatorial assumption for Gillespie is 
+        # that the agents (molecules) are identical s.t. the choice from susceptible/infected for reaction is simple.
+        # When the agents' opinion affects the infection rate, the formula for propensity does not work anymore
         propensity = (self.INF_RATE_MAX_PLUS_MIN - self.INF_RATE_MAX_MINUS_MIN * np.tanh(2 * self.opinions_curr.mean())) / 2
         return propensity * self.infection_curr[0] * self.infection_curr[1] / self.N
     
     def recovery_propensity(self):
         return self.REC_RATE * self.infection_curr[1]
 
-    def update_infected(self):
+    def update_infected(self) -> float:
         # Tau-leaping algorithm (variant of Gillepsie for fixed delta t)
+        self.infection_curr = np.clip(self.infection_curr, 0, self.N)
         inf_jumps = np.random.poisson(self.infection_propensity() * self.dt)
         rec_jumps = np.random.poisson(self.recovery_propensity() * self.dt)
+        # Consequence of using Tau-leaping is that recovery numbers could outgrow
+        # number of infected, hence make all infected recover in the case that
+        # more people have recovered than there are new infected + already infected
         self.infection_curr += inf_jumps * self.nu[0]
         self.infection_curr += rec_jumps * self.nu[1]
-        
+        return inf_jumps
 
     def opinion_history(self):
         return self.opinion_array
 
     def infection_history(self):
         return self.infection_array
+    
+    def infection_num_history(self):
+        return self.infection_num_array
 
 def main():
     # Parameters
-    N = 10000
+    N = 1000
+    initial_inf = 100
     initial_opinions = np.random.uniform(-1, 1, size=N)
-    grad_V = np.vectorize(lambda opinion, infected: infected * opinion**2 / 100)
+    grad_V = np.vectorize(lambda opinion, infected: -infected)
     model = opinion_dynamics(
-        num_grid_points=100,
-        max_t=100,
+        num_grid_points=1000,
+        max_t=1000,
         initial_opinions=initial_opinions,
-        noise_strength=0,
         N=N,
+        y0=np.array([N - initial_inf, initial_inf, 0]),
         interaction_distance=0,
-        y0=np.array([9550, 50, 0]),
+        noise_strength=0,
         stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
         grad_V=grad_V
     )
