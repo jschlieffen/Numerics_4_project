@@ -94,13 +94,14 @@ class opinion_dynamics:
 
 def main():
     # Parameters
-    N = 1000
+    N = 100000
     initial_inf = 100
+    sim_length = 150
     initial_opinions = np.random.uniform(-1, 1, size=N)
-    grad_V = np.vectorize(lambda opinion, infected: -infected)
+    grad_V = np.vectorize(lambda opinion, infected: 0)
     model = opinion_dynamics(
-        num_grid_points=1000,
-        max_t=1000,
+        num_grid_points=sim_length,
+        max_t=sim_length,
         initial_opinions=initial_opinions,
         N=N,
         y0=np.array([N - initial_inf, initial_inf, 0]),
@@ -116,11 +117,13 @@ def main():
     plt.hist(model.opinion_history()[-1], bins=5)
     plt.savefig('plots/other/final_opinions.png')
     plt.close()
-    plt.plot(model.t, model.infection_history()[:, 0], label='susceptible')
     plt.plot(model.t, model.infection_history()[:, 1], label='infected')
-    plt.plot(model.t, model.infection_history()[:, 2], label='recovered')
     plt.legend()
     plt.savefig('plots/other/infection_history.png')
+    plt.close()
+    plt.plot(model.t, model.infection_num_history(), label='infected_num')
+    plt.legend()
+    plt.savefig('plots/other/infection_num_history.png')
     plt.close()
 
 if __name__ == '__main__':
