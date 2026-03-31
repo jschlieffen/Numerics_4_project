@@ -86,7 +86,7 @@ class opinion_dynamics:
             elif self.grad_V == "polynomial":
                 alpha = (1 - 2 * self.grad_V_params[0])/(self.grad_V_params[0]**2 - self.grad_V_params[0])
                 inf_func = alpha * infected_frac**2 + (2 - alpha) * infected_frac - 1
-                self.opinions_curr -= 4 * self.opinions_curr * (self.opinions_curr**2 + 1) - 8 * self.grad_V_params[1] * inf_func(infected_frac) * self.opinions_curr**2 * self.dt
+                self.opinions_curr -= 4 * self.opinions_curr * (self.opinions_curr**2 + 1) - 8 * self.grad_V_params[1] * inf_func * self.opinions_curr**2 * self.dt
             
             self.opinions_curr = np.clip(self.opinions_curr, -3.5, 3.5)
             self.opinion_array[i] = np.copy(self.opinions_curr)
@@ -146,6 +146,7 @@ def main():
     N = 300000
     sim_to_data_ratio = 3
     sim_length = len(opinion_data) * sim_to_data_ratio
+    print(sim_length)
     initial_opinion = opinion_sampler(opinion_data[0], N)
     params = (0, 0)
     
@@ -158,7 +159,7 @@ def main():
         interaction_distance=0,
         noise_strength=0,
         stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
-        grad_V="sigmoid",
+        grad_V="none",
         grad_V_params=params,
         inf_rate_max=0.4
     )

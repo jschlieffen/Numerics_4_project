@@ -37,7 +37,7 @@ def run_simulation(parameters: tuple[float, float], initial_opinion: np.ndarray,
     Args:
         parameters (tuple[float, float]): Tuple of parameters for parametrizing the model function for coupling infections through external potential
             For choice="sigmoid", we have model function(infected, opinion): parameters[0] * (1 - infected) + parameters[1] * infected * sigmoid(opinion)
-            For choice="polynomial", we have a=parameters[0] and I_crit=parameters[1] (refer to model decribed in paper by Schütte)
+            For choice="polynomial", we have  I_crit=parameters[0] and a=parameters[1] (refer to model decribed in paper by Schütte)
         initial_opinion (np.ndarray): Inital opinion for each agent sampled from PDF
         initial_infected (int): Initial number of infected from data for simulation
         choice (str): Choice of coupling algorithm ("polynomial", "sigmoid")
@@ -138,7 +138,7 @@ def loss(parameters, opinion_data, opinion_idx, infection_data, infection_idx, i
 if __name__ == '__main__':
     # TODO: Either use the fixed maximum infection rate of 0.35 or include it as a parameter to optimize
     # TODO: Perform the optimization over the parameters of the model function for coupling opinions with infections, and its gradient
-    initial_guess = [0, 0]
+    initial_guess = [0.25, 1]
     
     # Choose start and end dates for infection data and opinion data
     start_date = datetime(2020, 3, 12)
@@ -168,10 +168,10 @@ if __name__ == '__main__':
     # Choice for model function for coupling opinions with infections
     # choices = ["polynomial", "sigmoid"]
     # When one of the above choices is not selected, grad_V is set to 0 and opinions stay constant
-    choice = "sigmoid"
+    choice = "polynomial"
     
     with futures.ProcessPoolExecutor(max_workers=NUM_WORKERS) as pool:
-        result = differential_evolution(func=loss, bounds=[(-1, 1), (-1, 1)], x0=initial_guess,
+        result = differential_evolution(func=loss, bounds=[(0.1, 0.9), (0, 1)], x0=initial_guess,
                                         args=(opinion_data, opinion_idx, infection_data, infection_idx, initial_infected, choice, pool),
                                         strategy='best1bin', disp=True, polish=False, popsize=5, maxiter=10, tol=0.1, workers=1)
     print(result)
