@@ -59,9 +59,14 @@ class opinion_dynamics:
         self.opinion_array = np.zeros((num_grid_points, len(initial_opinions)), dtype=float)
         self.opinion_array[0] = np.copy(initial_opinions)
         
-        self.infection_curr = np.copy(y0)
-        self.infection_array = np.zeros((num_grid_points, 3), dtype=float)
-        self.infection_array[0] = np.copy(y0)
+        
+        self.infection_curr = np.array(y0, dtype=int)
+        self.infection_array = np.zeros((num_grid_points, 3), dtype=int)
+        self.agent_state = np.zeros(len(initial_opinions), dtype=int) # (0, 1, 2) for (S, I, R)
+        inital_inf_idx = np.random.choice(len(initial_opinions), size=self.infection_curr[1], replace=False)
+        self.agent_state[inital_inf_idx] = 1
+        self.bin_counts = np.zeros(len(HIST_BINS) - 1, dtype=int)
+        self.infection_array[0] = np.copy(self.infection_curr)
         self.infection_num_array = np.zeros(num_grid_points)
         self.nu = np.array(stochiomatric_vectors)
         
@@ -76,6 +81,7 @@ class opinion_dynamics:
             # Updating the Infection numbers
             self.infection_num_array[i] = self.update_infected()
             self.infection_array[i] = np.copy(self.infection_curr)
+            
             # Apply grad_V to each agent with current infected numbers
             # drift_V = self.grad_V(self.opinions_curr, self.infection_curr[1]/self.N)
             # self.opinions_curr += -drift_V * self.dt
@@ -92,11 +98,13 @@ class opinion_dynamics:
             self.opinion_array[i] = np.copy(self.opinions_curr)
 
     def infection_propensity(self):
-        # TODO: Using the mean of opinion is really a band-aid solution, combinatorial assumption for Gillespie is 
-        # that the agents (molecules) are identical s.t. the choice from susceptible/infected for reaction is simple.
-        # When the agents' opinion affects the infection rate, the formula for propensity does not work anymore
-        propensity = (self.inf_rate_max_plus_min - self.inf_rate_max_minus_min * np.tanh(2 * self.opinions_curr.mean())) / 2
-        return propensity * self.infection_curr[0] * self.infection_curr[1] / self.N
+        bin_idx = np.clip((self.opinions_curr - HIST_BINS[0]).astype(int), 0, len(HIST_BINS) - 2)
+        bin_susceptible_counts = np.bincount(bin_idx[self.agent_state == 0], minlength=len(HIST_BINS) - 1)
+        self.bin_counts = np.bincount(bin_idx, minlength=len(HIST_BINS) - 1)
+        bin_sum = np.bincount(bin_idx, weights=self.opinions_curr, minlength=len(HIST_BINS) - 1)
+        bin_mean = bin_sum / np.maximum(self.bin_counts, 1)
+        propensities = (self.inf_rate_max_plus_min - self.inf_rate_max_minus_min * np.tanh(2 * bin_mean)) / 2
+        return bin_idx, propensities * bin_susceptible_counts * self.infection_curr[1] / self.N
     
     def recovery_propensity(self):
         return self.rec_rate * self.infection_curr[1]
@@ -104,12 +112,24 @@ class opinion_dynamics:
     def update_infected(self) -> float:
         # Tau-leaping algorithm (variant of Gillepsie for fixed delta t)
         self.infection_curr = np.clip(self.infection_curr, 0, self.N)
-        inf_jumps = np.random.poisson(self.infection_propensity() * self.dt)
+        bin_idx, propensities = self.infection_propensity()
+        infected_bins = np.random.poisson(propensities * self.dt)
+        for bin_i in range(len(infected_bins)):
+            if infected_bins[bin_i] > 0:
+                # Randomly choose bin_i agents from the susceptible population to become infected
+                candidates = np.flatnonzero((self.agent_state == 0) & (bin_idx == bin_i))
+                chosen = np.random.choice(candidates, size=min(infected_bins[bin_i], len(candidates)), replace=False)
+                self.agent_state[chosen] = 1
+        inf_jumps = np.sum(infected_bins)
         rec_jumps = np.random.poisson(self.recovery_propensity() * self.dt)
+        candidates = np.flatnonzero((self.agent_state == 1))
+        chosen = np.random.choice(candidates, size=min(rec_jumps, len(candidates)), replace=False)
+        self.agent_state[chosen] = 2
         # Consequence of using Tau-leaping is that recovery numbers could outgrow
         # number of infected, hence make all infected recover in the case that
         # more people have recovered than there are new infected + already infected
         self.infection_curr += inf_jumps * self.nu[0]
+        self.infection_curr = np.clip(self.infection_curr, 0, self.N)
         self.infection_curr += rec_jumps * self.nu[1]
         return inf_jumps
 
@@ -127,12 +147,13 @@ def main():
     start_date = datetime(2020, 3, 12)
     end_date = datetime(2020, 6, 26)
     infection_data = pd.read_csv("data/japan-covid-data.csv", index_col="date", parse_dates=["date"])
-    opinion_data = pd.read_csv("data/zib/Opinion_data/survey_data_original_JPN.csv", index_col="Date", parse_dates=["Date"])
+    initial_infected = infection_data.loc[start_date]["total_cases"]
     infection_data = infection_data.loc[start_date:end_date]
+    opinion_data = pd.read_csv("data/zib/Opinion_data/survey_data_original_JPN.csv", index_col="Date", parse_dates=["Date"])
     opinion_data = opinion_data.loc[start_date:end_date]
     
     # Total cases at the start date is used as initial number of infected for the simulation
-    initial_infected = infection_data['total_cases'].iloc[0]
+    # initial_infected = infection_data['total_cases'].iloc[0]
     # Reindex opinions to match the overall timescale
     opinion_data = opinion_data.reindex(infection_data.index)
     opinion_data = opinion_data.to_numpy()
@@ -143,25 +164,27 @@ def main():
     infection_data = (infection_data['new_cases']).to_numpy()
     
     # Parameters
-    N = 300000
-    sim_to_data_ratio = 3
-    sim_length = len(opinion_data) * sim_to_data_ratio
-    print(sim_length)
-    initial_opinion = opinion_sampler(opinion_data[0], N)
+    NUM_AGENTS = 125000
+    sim_length = len(opinion_data)
+    initial_opinion = opinion_sampler(opinion_data[0], NUM_AGENTS)
     params = (0, 0)
-    
+    print("Simulation parameters:")
+    print(f"Number of agents: {NUM_AGENTS}")
+    print(f"Length of simulation: {sim_length} time steps")
+
     model = opinion_dynamics(
         num_grid_points=sim_length,
         max_t=sim_length,
         initial_opinions=initial_opinion,
-        N=N,
-        y0=np.array([N - initial_infected, initial_infected, 0]),
+        N=NUM_AGENTS,
+        y0=np.array([NUM_AGENTS - initial_infected, initial_infected, 0]),
         interaction_distance=0,
         noise_strength=0,
         stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
         grad_V="none",
         grad_V_params=params,
-        inf_rate_max=0.4
+        inf_rate_max=0.3,
+        inf_rate_min=0.1
     )
     model.algo()
     
@@ -171,11 +194,19 @@ def main():
     plt.hist(model.opinion_history()[-1], bins=tuple(HIST_BINS))
     plt.savefig('plots/other/final_opinions.png')
     plt.close()
+    plt.plot(model.t, model.infection_history()[:, 0]/model.N)
+    plt.title('Susceptible history (percentage of population)')
+    plt.savefig('plots/other/susceptible_history.png')
+    plt.close()
     plt.plot(model.t, model.infection_history()[:, 1]/model.N)
     plt.title('Infection history (percentage of population)')
     plt.savefig('plots/other/infected_history.png')
     plt.close()
-    plt.plot(model.t[infection_idx * sim_to_data_ratio], infection_data[infection_idx], label='Data')
+    plt.plot(model.t, model.infection_history()[:, 2]/model.N)
+    plt.title('Recovered history (percentage of population)')
+    plt.savefig('plots/other/recovered_history.png')
+    plt.close()
+    plt.plot(model.t[infection_idx], infection_data[infection_idx], label='Data', ls="None", marker='o')
     plt.plot(model.t, model.infection_num_history(), label='Simulated')
     plt.title('Daily new infections (data vs simulated)')
     plt.legend()
