@@ -189,8 +189,11 @@ def loss(
 
 if __name__ == "__main__":
     # Perform the optimization over the parameters of the model function for coupling opinions with infections, and its gradient
-    initial_guess = [-4]
-
+    initial_guess = [-4] #sigmoid
+    #initial_guess = [-6.5, -2.5, -1.5] #sigmoid old
+    #initial_guess = [0.5, 1.0] #double well
+    #initial_guess = [-2.0, 0.5]  # polynomial
+    #initial_guess = [0.0, 1.0, 0.5, 1.0] #gaussian
     # Choose start and end dates for infection data and opinion data
     start_date = datetime(2020, 3, 12)
     end_date = datetime(2020, 6, 26)
@@ -236,7 +239,10 @@ if __name__ == "__main__":
     with futures.ProcessPoolExecutor(max_workers=NUM_WORKERS) as pool:
         result = differential_evolution(
             func=loss,
-            bounds=[(-4.4, -3.5)],
+            bounds=[(-4.4, -3.5)], #sigmoid
+            #bounds=[(-8, -5), (-4, -1), (-3, 0)], #sigmoid old
+            #bounds = [(-2, 2), (-5, 5)], #double well and polynomial
+            #bounds = [(-2.0, 2.0),(-5.0, 5.0),(0.1, 2.0),(0.1, 5.0)], # gaussian
             x0=initial_guess,
             args=(
                 opinion_data,

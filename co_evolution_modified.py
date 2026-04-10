@@ -8,6 +8,7 @@ from sim_plot import (
     plot_infection_histories,
     ridge_plot_ensemble_hist,
 )
+import sys
 
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -76,7 +77,7 @@ class opinion_dynamics:
         self.infection_num_array = np.zeros(num_grid_points)
         self.nu = np.array(stochiomatric_vectors)
 
-        _expected_params = {"sigmoid": 1, "polynomial": 2}
+        _expected_params = {"sigmoid": 1, "polynomial": 2, "double_well" : 2, "gaussian" : 4}
         if len(grad_V_params) != _expected_params[grad_V]:
             raise ValueError(
                 f"grad_V_params should have length {_expected_params[grad_V]} for choice of {grad_V}"
@@ -115,7 +116,27 @@ class opinion_dynamics:
                     * self.opinions_curr**2
                     * self.dt
                 )
-
+            elif self.grad_V == 'double_well':
+                a_I = self.grad_V_params[0] + self.grad_V_params[1] * infected_frac
+                self.opinions_curr -= (self.opinions_curr**3 - a_I * self.opinions_curr) * self.dt
+            elif self.grad_V == "gaussian":
+                mu0 = self.grad_V_params[0]
+                alpha = self.grad_V_params[1]
+                sigma = self.grad_V_params[2]
+                w = self.grad_V_params[3]
+            
+                infected_frac = self.infection_curr[1] / self.N
+                mu_I = mu0 + alpha * infected_frac
+            
+                diff = self.opinions_curr - mu_I
+            
+                self.opinions_curr -= (
+                    w * (diff / (sigma**2))
+                    * np.exp(- (diff**2) / (2 * sigma**2))
+                ) * self.dt
+            else:
+                print(f'unknown grad V: {self.grad_V}')
+                sys.exit(1)
             self.opinions_curr = np.clip(self.opinions_curr, -3.5, 3.5)
             self.opinion_array[i] = np.copy(self.opinions_curr)
 
@@ -216,7 +237,12 @@ def main():
     sim_length = len(opinion_data)
     initial_opinion = opinion_sampler(opinion_data[0], NUM_AGENTS)
 
-    params = (-1 * 10 ** (-3.55),)
+    params = (-1 * 10 ** (-3.55),) #sigmoid
+    #params = (-1.26e-7, 1.845e-3, 5.88e-2) #sigmoid old
+    #params = (1.15437545,0.66582349) # double well
+    #params = (-7.5855335,-2.82298756,-1.19457985) # sigmoid
+    #params = (-0.62589487,-1.03545536) # polynomial
+    #params = (1.20785755,0.75882561,0.32276008,0.30269294) #gaussian
     print(
         "Simulation parameters:\n",
         f"Number of agents: {NUM_AGENTS}\n",
