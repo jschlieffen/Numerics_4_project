@@ -1,11 +1,13 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-import joypy
 from datetime import datetime
 from scipy.special import expit
 from helpers import opinion_sampler, HIST_BINS
-from sim_plot import opinion_joy_plot
+from sim_plot import (
+    opinion_joy_plot,
+    plot_infection_histories,
+    ridge_plot_ensemble_hist,
+)
 
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -74,7 +76,7 @@ class opinion_dynamics:
         self.infection_num_array = np.zeros(num_grid_points)
         self.nu = np.array(stochiomatric_vectors)
 
-        _expected_params = {"sigmoid": 3, "polynomial": 2}
+        _expected_params = {"sigmoid": 1, "polynomial": 2}
         if len(grad_V_params) != _expected_params[grad_V]:
             raise ValueError(
                 f"grad_V_params should have length {_expected_params[grad_V]} for choice of {grad_V}"
@@ -96,17 +98,10 @@ class opinion_dynamics:
             if self.grad_V == "sigmoid":
                 self.opinions_curr -= (
                     self.grad_V_params[0]
-                    * self.infection_num_array[i]
+                    * np.mean(np.diff(self.infection_num_array[max(0, i - 2) : i + 1]))
                     * expit(self.opinions_curr)
-                    + self.grad_V_params[1]
-                    * (
-                        self.opinions_curr
-                        - self.grad_V_params[2]
-                        * np.mean(
-                            np.diff(self.infection_num_array[max(0, i - 6) : i + 1])
-                        )
-                    )
-                ) * self.dt
+                    * self.dt
+                )
             elif self.grad_V == "polynomial":
                 alpha = (1 - 2 * self.grad_V_params[0]) / (
                     self.grad_V_params[0] ** 2 - self.grad_V_params[0]
@@ -217,62 +212,71 @@ def main():
     infection_idx = (infection_data["new_cases"] > 0).to_numpy().nonzero()[0]
     infection_data = (infection_data["new_cases"]).to_numpy()
     # Parameters
-    NUM_AGENTS = 125000
+    NUM_AGENTS = 120000
     sim_length = len(opinion_data)
     initial_opinion = opinion_sampler(opinion_data[0], NUM_AGENTS)
-    # params = (1e-5, -1e-3, -1e-3)
-    params = (-1.26e-7, 1.845e-3, 5.88e-2)
+
+    params = (-1 * 10 ** (-3.55),)
     print(
         "Simulation parameters:\n",
         f"Number of agents: {NUM_AGENTS}\n",
         f"Length of simulation: {sim_length} time steps\n",
-        f"Model function: {params[0]} * daily_infected * sigmoid(opinion) + {params[1]} * (opinion - {params[2]} * daily_infected)\n",
     )
 
-    model = opinion_dynamics(
-        num_grid_points=sim_length,
-        max_t=sim_length,
-        initial_opinions=initial_opinion,
-        N=NUM_AGENTS,
-        y0=np.array([NUM_AGENTS - initial_infected, initial_infected, 0]),
-        interaction_distance=0,
-        noise_strength=0,
-        stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
-        grad_V="sigmoid",
-        grad_V_params=params,
-        inf_rate_max=0.3,
-        inf_rate_min=0.1,
-    )
-    model.algo()
+    # model = opinion_dynamics(
+    #     num_grid_points=sim_length,
+    #     max_t=sim_length,
+    #     initial_opinions=initial_opinion,
+    #     N=NUM_AGENTS,
+    #     y0=np.array([NUM_AGENTS - initial_infected, initial_infected, 0]),
+    #     interaction_distance=0,
+    #     noise_strength=0,
+    #     stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
+    #     grad_V="sigmoid",
+    #     grad_V_params=params,
+    #     inf_rate_max=0.32,
+    #     inf_rate_min=0.1,
+    # )
+    # model.algo()
 
-    # Plotting joy plots of simulated and real opinion distribution
-    opinion_joy_plot(opinion_data, model.opinion_history(), opinion_idx)
+    num_simulations = 10
+    multiple_infection_histories = []
+    multiple_infection_num_histories = []
+    multiple_opinion_histories = []
+
+    for _ in range(num_simulations):
+        model = opinion_dynamics(
+            num_grid_points=sim_length,
+            max_t=sim_length,
+            initial_opinions=initial_opinion,
+            N=NUM_AGENTS,
+            y0=np.array([NUM_AGENTS - initial_infected, initial_infected, 0]),
+            interaction_distance=0,
+            noise_strength=0,
+            stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
+            grad_V="sigmoid",
+            grad_V_params=params,
+            inf_rate_max=0.32,
+            inf_rate_min=0.1,
+        )
+        model.algo()
+        multiple_infection_histories.append(model.infection_history())
+        multiple_infection_num_histories.append(model.infection_num_history())
+        multiple_opinion_histories.append(model.opinion_history()[opinion_idx].copy())
+
+    ridge_plot_ensemble_hist(
+        multiple_opinion_histories, opinion_data, opinion_idx, spacing=0.5
+    )
 
     # Plotting susceptible, infected, recovered history and daily new infections vs data
-    plt.plot(model.t, model.infection_history()[:, 0] / model.N)
-    plt.title("Susceptible history (percentage of population)")
-    plt.savefig("plots/other/susceptible_history.png")
-    plt.close()
-    plt.plot(model.t, model.infection_history()[:, 1] / model.N)
-    plt.title("Infection history (percentage of population)")
-    plt.savefig("plots/other/infected_history.png")
-    plt.close()
-    plt.plot(model.t, model.infection_history()[:, 2] / model.N)
-    plt.title("Recovered history (percentage of population)")
-    plt.savefig("plots/other/recovered_history.png")
-    plt.close()
-    plt.plot(
-        model.t[infection_idx],
-        infection_data[infection_idx],
-        label="Data",
-        ls="None",
-        marker="o",
+    plot_infection_histories(
+        model.t,
+        model.N,
+        multiple_infection_histories,
+        multiple_infection_num_histories,
+        infection_data,
+        infection_idx,
     )
-    plt.plot(model.t, model.infection_num_history(), label="Simulated")
-    plt.title("Daily new infections (data vs simulated)")
-    plt.legend()
-    plt.savefig("plots/other/daily_infected_history.png")
-    plt.close()
 
 
 if __name__ == "__main__":

@@ -10,14 +10,14 @@ from datetime import datetime
 
 NUM_WORKERS = 6
 NUM_PATH_PER_WORKER = 3
-NUM_AGENTS = 125000
+NUM_AGENTS = 120000
 OPIN_BINS = (-3, -2, -1, 0, 1, 2, 3)
-MAX_INF_RATE = 0.3
+MAX_INF_RATE = 0.32
 MIN_INF_RATE = 0.1
 
 
 def run_simulation(
-    parameters: tuple[float, float],
+    parameters: tuple[float, ...],
     initial_opinion: np.ndarray,
     initial_infected: int,
     choice: str,
@@ -26,8 +26,8 @@ def run_simulation(
     """Run a single simulation with given parameters
 
     Args:
-        parameters (tuple[float, float]): Tuple of parameters for parametrizing the model function for coupling infections through external potential
-            For choice="sigmoid", we have model function(infected, opinion):
+        parameters (tuple[float, ...]): Tuple of parameters for parametrizing the model function for coupling infections through external potential
+            For choice="sigmoid", we have model function(infected, opinion): (parameters[0] * average_change_in_daily_infected) / (1 + np.exp(opinion))
             For choice="polynomial", we have  I_crit=parameters[0] and a=parameters[1] (refer to model decribed in paper by Schütte)
         initial_opinion (np.ndarray): Inital opinion for each agent sampled from PDF
         initial_infected (int): Initial number of infected from data for simulation
@@ -40,10 +40,9 @@ def run_simulation(
 
     if choice == "sigmoid":
         # For sigmoid coupling, parameters are on log scale
-        # Coefficient of sigmoid is negative while others two are positive
-        parameters = tuple(
-            np.array((-1, 1, 1)) * (10 ** np.array(parameters, dtype=float))
-        )
+        grad_param = (-1 * 10 ** parameters[0],)  # Coefficient of sigmoid is negative
+    else:
+        grad_param = parameters
 
     model = opinion_dynamics(
         num_grid_points=max_t,
@@ -55,7 +54,7 @@ def run_simulation(
         noise_strength=0,
         stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
         grad_V=choice,
-        grad_V_params=parameters,
+        grad_V_params=grad_param,
         inf_rate_max=MAX_INF_RATE,
         inf_rate_min=MIN_INF_RATE,
     )
@@ -64,7 +63,7 @@ def run_simulation(
 
 
 def composite_loss(
-    parameters: tuple[float, float],
+    parameters: tuple[float, ...],
     opinion_data: np.ndarray,
     opinion_idx: np.ndarray,
     infection_data: np.ndarray,
@@ -190,7 +189,7 @@ def loss(
 
 if __name__ == "__main__":
     # Perform the optimization over the parameters of the model function for coupling opinions with infections, and its gradient
-    initial_guess = [-6.5, -2.5, -1.5]
+    initial_guess = [-4]
 
     # Choose start and end dates for infection data and opinion data
     start_date = datetime(2020, 3, 12)
@@ -237,7 +236,7 @@ if __name__ == "__main__":
     with futures.ProcessPoolExecutor(max_workers=NUM_WORKERS) as pool:
         result = differential_evolution(
             func=loss,
-            bounds=[(-8, -5), (-4, -1), (-3, 0)],
+            bounds=[(-4.4, -3.5)],
             x0=initial_guess,
             args=(
                 opinion_data,
