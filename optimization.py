@@ -7,6 +7,7 @@ import pandas as pd
 from itertools import repeat
 from concurrent import futures
 from datetime import datetime
+import time
 
 NUM_WORKERS = 6
 NUM_PATH_PER_WORKER = 3
@@ -186,13 +187,14 @@ def loss(
     # return avg_infection_err + avg_opinion_err
     return avg_infection_err + avg_opinion_err
 
-
+#TODO: make enough runs for good estimation.
 if __name__ == "__main__":
+    start_time_exec = time.time()
     # Perform the optimization over the parameters of the model function for coupling opinions with infections, and its gradient
-    initial_guess = [-4] #sigmoid
+    #initial_guess = [-4] #sigmoid
     #initial_guess = [-6.5, -2.5, -1.5] #sigmoid old
     #initial_guess = [0.5, 1.0] #double well
-    #initial_guess = [-2.0, 0.5]  # polynomial
+    initial_guess = [-2.0, 0.5]  # polynomial
     #initial_guess = [0.0, 1.0, 0.5, 1.0] #gaussian
     # Choose start and end dates for infection data and opinion data
     start_date = datetime(2020, 3, 12)
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     # Choice for model function for coupling opinions with infections
     # choices = ["polynomial", "sigmoid"]
     # When one of the above choices is not selected, grad_V is set to 0 and opinions stay constant
-    choice = "sigmoid"
+    choice = "polynomial"
 
     # Differential evolution convergence condition is determined by population energies (losses of population)
     # with formula np.std(population_energies) <= atol + tol * np.abs(np.mean(population_energies))
@@ -239,9 +241,9 @@ if __name__ == "__main__":
     with futures.ProcessPoolExecutor(max_workers=NUM_WORKERS) as pool:
         result = differential_evolution(
             func=loss,
-            bounds=[(-4.4, -3.5)], #sigmoid
+            #bounds=[(-4.4, -3.5)], #sigmoid
             #bounds=[(-8, -5), (-4, -1), (-3, 0)], #sigmoid old
-            #bounds = [(-2, 2), (-5, 5)], #double well and polynomial
+            bounds = [(-2, 2), (-5, 5)], #double well and polynomial
             #bounds = [(-2.0, 2.0),(-5.0, 5.0),(0.1, 2.0),(0.1, 5.0)], # gaussian
             x0=initial_guess,
             args=(
@@ -264,3 +266,10 @@ if __name__ == "__main__":
             workers=1,
         )
     print(result)
+    end_time_exec = time.time()
+    print(f"execution time: {end_time_exec - start_time_exec}")
+    with open(f"logs/{choice}_log.txt",'w') as f:
+        f.write(str(result) + "\n")
+       # f.write()
+        f.write(f"execution time: {end_time_exec - start_time_exec} \n")
+        f.close()

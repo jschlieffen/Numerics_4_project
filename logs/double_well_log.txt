@@ -1,0 +1,13 @@
+             message: Maximum number of iterations has been exceeded.
+             success: False
+                 fun: 0.2503890942838764
+                   x: [ 1.138e+00  6.804e-01]
+                 nit: 20
+                nfev: 549
+          population: [[ 1.138e+00  6.804e-01]
+                       [ 1.073e+00  7.267e-01]
+                       ...
+                       [ 1.312e+00 -1.775e-01]
+                       [ 1.379e+00 -2.078e-01]]
+ population_energies: [ 2.504e-01  2.618e-01 ...  2.654e-01  2.597e-01]
+execution time: 2180.084347486496 

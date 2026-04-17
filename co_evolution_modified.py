@@ -237,12 +237,14 @@ def main():
     sim_length = len(opinion_data)
     initial_opinion = opinion_sampler(opinion_data[0], NUM_AGENTS)
 
-    params = (-1 * 10 ** (-3.55),) #sigmoid
+
+    #params = ( (-3.575),) #sigmoid
     #params = (-1.26e-7, 1.845e-3, 5.88e-2) #sigmoid old
     #params = (1.15437545,0.66582349) # double well
     #params = (-7.5855335,-2.82298756,-1.19457985) # sigmoid
-    #params = (-0.62589487,-1.03545536) # polynomial
-    #params = (1.20785755,0.75882561,0.32276008,0.30269294) #gaussian
+    
+    params = (1.08303846,3.92245939) # polynomial
+    #params = (-0.64482276,-0.08968004,0.1181478,.039301499) #gaussian
     print(
         "Simulation parameters:\n",
         f"Number of agents: {NUM_AGENTS}\n",
@@ -280,7 +282,7 @@ def main():
             interaction_distance=0,
             noise_strength=0,
             stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
-            grad_V="sigmoid",
+            grad_V="polynomial",
             grad_V_params=params,
             inf_rate_max=0.32,
             inf_rate_min=0.1,
