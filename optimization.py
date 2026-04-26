@@ -9,7 +9,7 @@ from concurrent import futures
 from datetime import datetime
 import time
 
-NUM_WORKERS = 6
+NUM_WORKERS = 10
 NUM_PATH_PER_WORKER = 3
 NUM_AGENTS = 120000
 OPIN_BINS = (-3, -2, -1, 0, 1, 2, 3)
@@ -42,6 +42,10 @@ def run_simulation(
     if choice == "sigmoid":
         # For sigmoid coupling, parameters are on log scale
         grad_param = (-1 * 10 ** parameters[0],)  # Coefficient of sigmoid is negative
+    elif choice == "double_well" or choice == "polynomial":
+        grad_param = (-1* 10 **parameters[0], -1*10**parameters[1])
+    elif choice == 'gaussian':
+        grad_param = ( -1*10**parameters[0],-1*10**parameters[1],-1*10**parameters[2],-1*10**parameters[3],)
     else:
         grad_param = parameters
 
@@ -234,6 +238,7 @@ if __name__ == "__main__":
     # choices = ["polynomial", "sigmoid"]
     # When one of the above choices is not selected, grad_V is set to 0 and opinions stay constant
     choice = "polynomial"
+    print(choice)
 
     # Differential evolution convergence condition is determined by population energies (losses of population)
     # with formula np.std(population_energies) <= atol + tol * np.abs(np.mean(population_energies))
@@ -259,7 +264,7 @@ if __name__ == "__main__":
             disp=True,
             polish=True,
             popsize=10,
-            maxiter=20,
+            maxiter=200,
             init="latinhypercube",
             atol=1e-3,  # type: ignore[arg-type]
             tol=1e-3,

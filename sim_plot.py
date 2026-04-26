@@ -5,7 +5,9 @@ import joypy
 from helpers import opinion_sampler, HIST_BINS
 
 
-def opinion_joy_plot(opinion_data, opinion_simulation, opinion_idx):
+
+
+def opinion_joy_plot(opinion_data, opinion_simulation, opinion_idx, choice):
     sim_records = []
     real_records = []
     for i in opinion_idx:
@@ -20,11 +22,11 @@ def opinion_joy_plot(opinion_data, opinion_simulation, opinion_idx):
         )
     df1 = pd.concat(sim_records, axis=1)
     fig, axes = joypy.joyplot(df1, overlap=0.5, colormap=plt.cm.plasma)
-    plt.savefig("plots/other/sim_opinion_joyplot.png")
+    plt.savefig(f"plots/{choice}_V2/sim_opinion_joyplot.png")
     plt.close()
     df2 = pd.concat(real_records, axis=1)
     fig, axes = joypy.joyplot(df2, overlap=0.5, colormap=plt.cm.plasma)
-    plt.savefig("plots/other/real_opinion_joyplot.png")
+    plt.savefig(f"plots/{choice}_V2/real_opinion_joyplot.png")
     plt.close()
 
 
@@ -32,6 +34,7 @@ def ridge_plot_ensemble_hist(
     opinion_histories,
     real_opinion_data,
     opinion_idx,
+    choice,
     colormap=plt.cm.plasma,  # type: ignore[arg-type]
     spacing=0.3,
 ):
@@ -85,7 +88,7 @@ def ridge_plot_ensemble_hist(
         ax.set_title(title)
 
     plt.tight_layout()
-    plt.savefig("plots/other/opinion_ridge_hist.png", dpi=150)
+    plt.savefig(f"plots/{choice}_V2/opinion_ridge_hist.png", dpi=150)
     plt.close()
 
 
@@ -96,6 +99,7 @@ def plot_infection_histories(
     daily_infection_histories,  # list of (T,) arrays, one per trajectory
     real_daily_infections,
     real_infection_idx,
+    choice
 ):
     n = len(infection_histories)
     titles = ["Susceptible", "Infected", "Recovered"]
@@ -118,7 +122,7 @@ def plot_infection_histories(
         ax.set_title(f"{titles[col]} (% of population)")
         ax.spines[["top", "right"]].set_visible(False)
     plt.tight_layout()
-    plt.savefig("plots/other/sir_history.png", dpi=150)
+    plt.savefig(f"plots/{choice}_V2/sir_history.png", dpi=150)
     plt.close()
 
     # Daily infections vs data
@@ -139,5 +143,5 @@ def plot_infection_histories(
     ax.legend()
     ax.spines[["top", "right"]].set_visible(False)
     plt.tight_layout()
-    plt.savefig("plots/other/daily_infections.png", dpi=150)
+    plt.savefig(f"plots/{choice}_V2/daily_infections.png", dpi=150)
     plt.close()

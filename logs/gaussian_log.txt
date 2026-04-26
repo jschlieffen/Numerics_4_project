@@ -1,13 +1,13 @@
-             message: Maximum number of iterations has been exceeded.
-             success: False
-                 fun: 0.11215565377835604
-                   x: [-6.448e-01 -8.968e-02  1.181e-01  3.930e-01]
-                 nit: 20
-                nfev: 945
-          population: [[-6.448e-01 -8.968e-02  1.181e-01  3.930e-01]
-                       [-8.028e-01  4.863e-01  1.335e-01  4.996e-01]
+             message: Optimization terminated successfully.
+             success: True
+                 fun: 0.11195639650617088
+                   x: [ 5.320e-01  3.684e+00  1.540e+00  1.748e-01]
+                 nit: 28
+                nfev: 1285
+          population: [[ 5.320e-01  3.684e+00  1.540e+00  1.748e-01]
+                       [ 4.988e-01  3.765e+00  1.436e+00  3.431e-01]
                        ...
-                       [-7.871e-01 -2.606e-02  1.172e-01  4.664e-01]
-                       [-1.237e+00 -1.120e-01  1.373e-01  5.762e-01]]
- population_energies: [ 1.122e-01  1.182e-01 ...  1.122e-01  1.173e-01]
-execution time: 2905.0837597846985 
+                       [-5.646e-01  3.563e+00  1.573e+00  1.541e-01]
+                       [ 7.097e-01  3.702e+00  1.720e+00  3.100e-01]]
+ population_energies: [ 1.120e-01  1.156e-01 ...  1.147e-01  1.143e-01]
+execution time: 7257.405715942383 

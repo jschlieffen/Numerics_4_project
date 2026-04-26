@@ -9,6 +9,8 @@ from sim_plot import (
     ridge_plot_ensemble_hist,
 )
 import sys
+import log_msg as log
+import os
 
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -238,13 +240,15 @@ def main():
     initial_opinion = opinion_sampler(opinion_data[0], NUM_AGENTS)
 
 
-    #params = ( (-3.575),) #sigmoid
+    #params = ( (-1 * 10 ** (-3.60207276)),) #sigmoid
     #params = (-1.26e-7, 1.845e-3, 5.88e-2) #sigmoid old
-    #params = (1.15437545,0.66582349) # double well
-    #params = (-7.5855335,-2.82298756,-1.19457985) # sigmoid
-    
-    params = (1.08303846,3.92245939) # polynomial
-    #params = (-0.64482276,-0.08968004,0.1181478,.039301499) #gaussian
+    #params = ((-1 * 10**(-1.77993613)),(-1 * 10 **(-4.71933849)))
+    params = (1.26499219,0.32200403) #double well
+    #params = (-1*10**(-1.6945262),-1*10**(-0.6466671))
+    #params = (0.05330867,0.9272398) # polynomial
+    #params = (-1*10**(-0.03109129),-1*10**(-2.53513431)) #polynomial
+    #params = (0.42394705,0.51700104,0.31148605,0.32108843) #gaussian
+    #params = (-1*10**(0.53202058),-1*10**(3.68437549),-1*10**(1.54035965),-1*10**(0.17475442)) #gaussian
     print(
         "Simulation parameters:\n",
         f"Number of agents: {NUM_AGENTS}\n",
@@ -267,12 +271,18 @@ def main():
     # )
     # model.algo()
 
-    num_simulations = 10
+    num_simulations = 100000
     multiple_infection_histories = []
     multiple_infection_num_histories = []
     multiple_opinion_histories = []
+    #choice = "polynomial"
+    choice = "double_well"
+    if not os.path.exists(f"plots/{choice}_V2"):
+        os.mkdir(f"plots/{choice}_V2")
 
     for _ in range(num_simulations):
+        if _ % 10 == 0:
+            log.logger.info(f"Simulation num: {_}")
         model = opinion_dynamics(
             num_grid_points=sim_length,
             max_t=sim_length,
@@ -282,7 +292,7 @@ def main():
             interaction_distance=0,
             noise_strength=0,
             stochiomatric_vectors=np.array([[-1, 1, 0], [0, -1, 1]]),
-            grad_V="polynomial",
+            grad_V=choice,
             grad_V_params=params,
             inf_rate_max=0.32,
             inf_rate_min=0.1,
@@ -293,7 +303,7 @@ def main():
         multiple_opinion_histories.append(model.opinion_history()[opinion_idx].copy())
 
     ridge_plot_ensemble_hist(
-        multiple_opinion_histories, opinion_data, opinion_idx, spacing=0.5
+        multiple_opinion_histories, opinion_data,  opinion_idx,choice, spacing=0.5, 
     )
 
     # Plotting susceptible, infected, recovered history and daily new infections vs data
@@ -304,6 +314,7 @@ def main():
         multiple_infection_num_histories,
         infection_data,
         infection_idx,
+        choice
     )
 
 
